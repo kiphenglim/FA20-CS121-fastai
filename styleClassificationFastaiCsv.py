@@ -29,21 +29,10 @@ from fastai.vision import *
 import pathlib
 import PIL
 import pandas as pd
+import numpy
 
-"""Now unzip the files using the following code."""
 
-from google.colab import drive
-drive.mount('/content/drive')
-
-"""At this point you should have a directory data/AB/A that contains
-your A images and a directory data/AB/B that contains your B
-images. For some reason, some people found that an intermediate
-directory is created. For example, the A images were in data/ABC/A/A.
-If this happened to you uncomment and run the following code, replace
-A by your category name and then repeat for B."""
-
-#root = "/content/drive/My Drive/CS Classes/CS 121/CS121F20_ Team_1_Art/Photos/"
-#root = "/content/drive/My Drive/HMC/2020-2021/FA20-CS121/CS121F20_ Team_1_Art/Photos/"
+## Read the cleaned CSVs and create a df
 root = "wikiart/"
 train = pd.read_csv(root+"wikiart_csv/style_train_clean.csv", header=None)
 valid = pd.read_csv(root+"wikiart_csv/style_valid_clean.csv", header=None)
@@ -61,9 +50,12 @@ style_dict = {0: "Abstract_Expressionism", 1: "Action_painting", 2: "Analytical_
               23: "Romanticism", 24: "Symbolism", 25: "Synthetic_Cubism",
               26: "Ukiyo_e" }
 
+
+## Sample max 200 photos/category
 style_list = []
 num_sample = 200
 df.columns = ["path", "label"]
+
 for key in style_dict:
   temp = df[df.label == style_dict[key]]
   print (str(style_dict[key]) + " " + str(len(temp.index)))
@@ -74,72 +66,48 @@ for key in style_dict:
 style_df = pd.concat(style_list)
 style_df.head()
 
-"""## 5. View data"""
 
-import numpy
+## Create an ImageDataBunch from the dataframe
 np.random.seed(42)
 
-styles_path = root+"Style/wikiart"
+styles_path = root+"wikiart"
 data = ImageDataBunch.from_df(df=style_df, path=styles_path,
                               valid_pct=0.2,
                               ds_tfms=get_transforms(),
                               size=180, num_workers=4).normalize(imagenet_stats)
 
-"""Good! Let's take a look at some of our pictures then."""
 
+## Verify the number of images
 data.classes, data.c, len(data.train_ds), len(data.valid_ds)
 
-"""## 6.Train model
 
-In this section you'll replicate the approach in lesson 2 to train
-your model. Note the create_cnn has now been deprecated :( but it is
-fine to use so ignore the warning.  """
-
+## Create a CNN learner and train
 learn = create_cnn(data, models.resnet34, metrics=error_rate)
 learn.fit_one_cycle(20)
 learn.save('stage-1')
 
-"""## 7.Interpretation
 
-In this section you'll replicate the approach in lesson 2 to interpret
-your data.  """
-
+## Load the CNN learner and figure out top losses
 learn.load('stage-1');
 interp = ClassificationInterpretation.from_learner(learn)
 interp.plot_top_losses(9, figsize=(15,11))
 interp.most_confused(min_val=2)
 interp.plot_confusion_matrix()
 
+
+## Export the learner
 learn.export('allStylesBasic.pkl')
 
-"""# 8. Improvements to the Model"""
-
-from fastai.widgets import *
-ds, idxs = DatasetFormatter().from_toplosses(learn, n_imgs=100)
-ImageCleaner(ds, idxs, '/notebooks/course-v3/nbs/dl1/data')
-df = pd.read_csv('data/cleaned.csv') 
-data = ImageDataBunch.from_df(path=Path('data'), df=df,
-                              ds_tfms=get_transforms(), size=224, bs=32)
-
-data.classes, data.c, len(data.train_ds), len(data.valid_ds)
-
-# Retrain on cleaned photos :)
-learn.fit_one_cycle(4)
-learn.save('stage-2')
-learn.load('stage-2')
-interp = ClassificationInterpretation.from_learner(learn)
-interp.plot_top_losses(9, figsize=(15,11))
-interp.most_confused(min_val=2)
-interp.plot_confusion_matrix()
 
 # Find a better learning rate
 learn.lr_find()
 learn.recorder.plot()
 
+
 # Now with better learning rate
 learn.unfreeze()
 learn.fit_one_cycle(4, max_lr=slice(1e-4, 1e-2))
 
+
 # Retrain with Many epochs
 learn.fit_one_cycle(50, max_lr=slice(1e-4, 1e-2))
-
