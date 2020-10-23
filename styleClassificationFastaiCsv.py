@@ -29,15 +29,25 @@ from fastai.vision import *
 import pathlib
 import PIL
 import pandas as pd
+import matplotlib.pyplot as plt
 import numpy
+import warnings
+
+# Prevent warnings from appearing more than once
+warnings.filterwarnings('ignore')
+
+
+# Create a textfile holding our output
+out = open("style_unfreeze_300_output.txt", "w")
 
 
 ## Read the cleaned CSVs and create a df
 root = "wikiart/"
-train = pd.read_csv(root+"wikiart_csv/style_train_clean.csv", header=None)
-valid = pd.read_csv(root+"wikiart_csv/style_valid_clean.csv", header=None)
+train = pd.read_csv(root+"wikiart_csv/style_train_clean.csv", header=None, index_col=0)
+valid = pd.read_csv(root+"wikiart_csv/style_valid_clean.csv", header=None, index_col=0)
 df = pd.concat([train, valid])
-df.head()
+out.write("Styles Dataframe\n")
+out.writelines([df.head().to_string(), "\n", "\n"])
 
 style_dict = {0: "Abstract_Expressionism", 1: "Action_painting", 2: "Analytical_Cubism",
               3: "Art_Nouveau", 4: "Baroque", 5: "Color_Field_Painting",
@@ -53,61 +63,73 @@ style_dict = {0: "Abstract_Expressionism", 1: "Action_painting", 2: "Analytical_
 
 ## Sample max 200 photos/category
 style_list = []
-num_sample = 200
+num_sample = 300
 df.columns = ["path", "label"]
 
 for key in style_dict:
   temp = df[df.label == style_dict[key]]
-  print (str(style_dict[key]) + " " + str(len(temp.index)))
   if (len(temp.index) >= num_sample):
     temp = temp.sample(n = num_sample, random_state=1)
   style_list.append(temp)
 
 style_df = pd.concat(style_list)
-style_df.head()
+out.write("Sampled Styles Dataframe\n")
+out.writelines([style_df.head().to_string(), "\n", "\n"])
 
 
 ## Create an ImageDataBunch from the dataframe
-np.random.seed(42)
-
 styles_path = root+"wikiart"
 data = ImageDataBunch.from_df(df=style_df, path=styles_path,
                               valid_pct=0.2,
                               ds_tfms=get_transforms(),
-                              size=180, num_workers=4).normalize(imagenet_stats)
+                              size=180, num_workers=0).normalize(imagenet_stats)
 
 
 ## Verify the number of images
-data.classes, data.c, len(data.train_ds), len(data.valid_ds)
+out.write("Verify number of images per class\n")
+out.writelines(data.classes)
+out.write("\n")
+out.writelines(["Training set size: ", str(len(data.train_ds)), "\n",
+                "Validation set size: ", str(len(data.valid_ds))])
 
 
 ## Create a CNN learner and train
 learn = create_cnn(data, models.resnet34, metrics=error_rate)
-learn.fit_one_cycle(20)
-learn.save('stage-1')
+
+"""
+## Find a better learning rate - Optimal LR: 1e-01
+learn.lr_find()
+learn.recorder.plot()
+plt.show()
+plt.savefig("style_lr_300.png")
+"""
 
 
-## Load the CNN learner and figure out top losses
-learn.load('stage-1');
-interp = ClassificationInterpretation.from_learner(learn)
-interp.plot_top_losses(9, figsize=(15,11))
-interp.most_confused(min_val=2)
-interp.plot_confusion_matrix()
+## Train with custom learning rate
+learn.unfreeze()
+learn.fit_one_cycle(20, max_lr=slice(1e-4, 1e-2))
 
 
 ## Export the learner
-learn.export('allStylesBasic.pkl')
+learn.save("style_unfreeze_300")
+learn.export("./style_unfreeze_300.pkl")
 
 
-# Find a better learning rate
-learn.lr_find()
-learn.recorder.plot()
+## Show and save top losses
+learn.load("style_unfreeze_300")
+interp = ClassificationInterpretation.from_learner(learn)
+interp.plot_top_losses(9, figsize=(15,11))
+plt.savefig("style_unfreeze_300_top_losses.png")
 
 
-# Now with better learning rate
-learn.unfreeze()
-learn.fit_one_cycle(4, max_lr=slice(1e-4, 1e-2))
+## Show and save confusion matrix
+interp.plot_confusion_matrix()
+plt.savefig("style_unfreeze_300_confusion_matrix.png")
+confused = interp.most_confused(min_val=2)
+for style_class in confused:
+  out.writelines(str(style_class))
+  out.write("\n")
 
 
-# Retrain with Many epochs
-learn.fit_one_cycle(50, max_lr=slice(1e-4, 1e-2))
+# Close the output file
+out.close()
