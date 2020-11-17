@@ -1,12 +1,16 @@
+""" You can download the Style CSVs from the cs-chan/ArtGAN Github
+repository. Assuming that you have already downloaded the entire ~28
+GB dataset from the provided link, this script removes rows from the
+Style CSV if that image is not present on your local computer. """
+
 from collections import namedtuple
 import pathlib
-import PIL
 import pandas as pd
 
 # Read CSVs
-root = "wikiart/"
-train = pd.read_csv(root+"wikiart_csv/style_train.csv", header=None)
-valid = pd.read_csv(root+"wikiart_csv/style_val.csv", header=None)
+ROOT = "wikiart/"
+train = pd.read_csv(ROOT+"wikiart_csv/style_train.csv", header=None)
+valid = pd.read_csv(ROOT+"wikiart_csv/style_val.csv", header=None)
 
 style_dict = {0: "Abstract_Expressionism", 1: "Action_painting", 2: "Analytical_Cubism",
               3: "Art_Nouveau", 4: "Baroque", 5: "Color_Field_Painting",
@@ -26,24 +30,24 @@ Pandas = namedtuple("Pandas", "index pathname classname")
 # Iterate over rows and add only if path exists
 train_cleaned = []
 for row in train.itertuples():
-  if (pathlib.Path(root+"wikiart/"+row[1]).exists()):
-    classed = Pandas(row[0], row[1], style_dict[row[2]])
-    train_cleaned.append(classed)
+    if pathlib.Path(ROOT+"wikiart/"+row[1]).exists():
+        classed = Pandas(row[0], row[1], style_dict[row[2]])
+        train_cleaned.append(classed)
 
 # Write to CSV
 trained_clean_df = pd.DataFrame(train_cleaned)
-trained_clean_df.to_csv(path_or_buf=root+"wikiart_csv/style_train_clean.csv",
+trained_clean_df.to_csv(path_or_buf=ROOT+"wikiart_csv/style_train_clean.csv",
                         index=None, header=None)
 
 ## Valid CSV
 # Iterate over rows and add only if path exists
 valid_cleaned = []
 for row in valid.itertuples():
-  if (pathlib.Path(root+"wikiart/"+row[1]).exists()):
-    classed = Pandas(row[0], row[1], style_dict[row[2]])
-    valid_cleaned.append(classed)
+    if pathlib.Path(ROOT+"wikiart/"+row[1]).exists():
+        classed = Pandas(row[0], row[1], style_dict[row[2]])
+        valid_cleaned.append(classed)
 
 # Write to CSV
 valid_clean_df = pd.DataFrame(valid_cleaned)
-valid_clean_df.to_csv(path_or_buf=root+"wikiart_csv/style_valid_clean.csv",
+valid_clean_df.to_csv(path_or_buf=ROOT+"wikiart_csv/style_valid_clean.csv",
                       index=None, header=None)
