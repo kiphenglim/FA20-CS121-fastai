@@ -29,7 +29,7 @@ inconsistencies between the CSV and photo downloads that neccessitated
 this extra step.
 
 After this, you can run classify_artist.py, classify_genre.py, and
-classify_artist.py using fast.ai. Each of these scripts will output a
+classify_style.py using fast.ai. Each of these scripts will output a
 model, a confusion matrix, and a photo of the top losses. The top
 losses and confusion matrix are both saved as images in the local
 directory. Additionally, the top losses is saved as a list inside a
